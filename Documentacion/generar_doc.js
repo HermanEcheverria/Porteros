@@ -35,14 +35,14 @@ const CODIGO = (lineas) => lineas.map((l) => new Paragraph({
 }));
 
 let nFig = 0, nTab = 0;
-function FIGURA(archivo, anchoPx, titulo) {
+function FIGURA(archivo, anchoPx, titulo, dims) {
   const buf = fs.readFileSync(path.join(FIG, archivo));
-  const w = buf.readUInt32BE(16), h = buf.readUInt32BE(20); // PNG
+  const [w, h] = dims || [buf.readUInt32BE(16), buf.readUInt32BE(20)]; // PNG (o medidas dadas para JPG)
   const ancho = anchoPx, alto = Math.round((anchoPx * h) / w);
   nFig++;
   return [
     new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 120, after: 40 }, keepNext: true,
-      children: [new ImageRun({ type: "png", data: buf, transformation: { width: ancho, height: alto },
+      children: [new ImageRun({ type: archivo.endsWith(".jpg") ? "jpg" : "png", data: buf, transformation: { width: ancho, height: alto },
         altText: { title: titulo, description: titulo, name: archivo } })] }),
     new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 200 },
       children: [new TextRun({ text: `Figura ${nFig}. `, bold: true, size: 19, color: "444444" }), new TextRun({ text: titulo, italics: true, size: 19, color: "444444" })] }),
@@ -184,7 +184,8 @@ add(H1("4. Arquitectura general hardware–software"),
 // 5
 add(H1("5. Diseño y construcción mecánica"),
   H2("5.1 Arena"),
-  P("La arena es un octágono simétrico. Las dimensiones se redujeron respecto a la referencia de 700 x 700 mm porque el recorrido útil de los rieles de impresora disponibles es de 210 mm; con una portería de 300 mm, una cancha más grande dejaría zonas imposibles de defender. Todas las medidas se tomaron con regla y se usan directamente en el software."),
+  P("La arena es un octágono simétrico. Las dimensiones se redujeron respecto a la referencia de 700 x 700 mm porque el recorrido útil de los rieles de impresora disponibles es de 210 mm; con una portería de 300 mm, una cancha más grande dejaría zonas imposibles de defender. Todas las medidas se tomaron con regla y se usan directamente en el software. La arena se trazó y cortó en cartón (Figura 3); después se agregaron rampas blancas inclinadas al pie de las paredes para que la bola no se quede atorada en las esquinas."),
+  ...FIGURA("fotos_arena.jpg", 600, "Construcción de la arena: trazado del octágono, corte del cartón, armado de las paredes y arena terminada.", [1620, 570]),
   ...TABLA("Dimensiones de la arena construida frente a la referencia.",
     ["Elemento", "Referencia del enunciado", "Construido", "Justificación"],
     [["Área de juego", "700 x 700 mm", "400 mm entre caras de los porteros x 430 mm entre paredes rectas", "Escalada al recorrido del riel (210 mm)"],
@@ -200,6 +201,9 @@ add(H1("5. Diseño y construcción mecánica"),
   B("Desplazamiento en ambos sentidos con un puente H L298N."),
   B("Velocidad de trabajo definida por calibración: portero izquierdo ≈ 490 mm/s con PWM 190; el derecho necesita PWM 255 por mayor fricción mecánica."),
   B("A PWM 255 el carro izquierdo alcanzaba ~1 m/s y se trababa contra el final de carrera, por eso su velocidad se limitó."),
+  P("Antes de llegar a esta solución se probó un chasis con piezas LEGO movido por un motor DC y una paleta articulada (Figura 5). Se cambió al riel de impresora porque ya trae guía, banda y motor alineados, y es más rígido y repetible. La paleta y el solenoide se montaron primero sobre el carro con piezas LEGO para las pruebas de movimiento (Figura 6)."),
+  ...FIGURA("fotos_prototipos.jpg", 600, "Primeros prototipos: chasis LEGO, motor DC, paleta articulada y el riel de la impresora Epson que se reutilizó.", [2154, 570]),
+  ...FIGURA("fotos_integracion.jpg", 600, "Integración: riel con Arduino y L298N, solenoide montado en el carro, pruebas de movimiento y medición de voltajes.", [1533, 570]),
   H2("5.3 Mecanismo de golpe"),
   P("Un solenoide de empuje (push) de 12 V con un bloque de madera en el émbolo empuja la bola. Con pulsos de 80–120 ms el émbolo apenas se movía por la masa del bloque; con **350 ms** sale completo. El firmware impide activaciones repetidas: ignora una orden nueva hasta que pasaron el pulso más 500 ms de regreso del émbolo."));
 
@@ -341,7 +345,7 @@ add(H1("10. Percepción, predicción e intercepción"),
   P("Se midió una latencia de ≈ 100 ms entre lo que ocurre en la cancha y su procesamiento (cámara, transmisión iVCam y proceso), tanto por WiFi como por USB. Para decidir con la posición real se adelanta la estimación: x ← x + vx·0,10 y y ← y + vy·0,10."),
   H2("10.4 Intercepción"),
   P("Para cada portero, si la bola se acerca a su línea (x_l) a más de 50 mm/s, el tiempo de llegada es t = (x_l − x)/vx y la altura de cruce sin paredes es y* = y + vy·t. Los rebotes en las paredes de arriba (y = 0) y abajo (y = 430 mm) se resuelven por reflexión en espejo: se toma y* módulo 860 mm y, si pasa de 430, se refleja (860 − y*). Si la bola se aleja, el portero sigue su altura; si no se ve durante 1 s, vuelve al centro."),
-  P("La altura de cruce se convierte a la coordenada del carro con la recta medida para cada portero, carro = (y* − y₀)/(s·e), donde y₀ es la altura del portero en el tope izquierdo, s = ±1 el sentido y e la escala. Se calibra moviendo cada carro a 5 posiciones y midiendo el bloque en la imagen (Figura 10)."),
+  P("La altura de cruce se convierte a la coordenada del carro con la recta medida para cada portero, carro = (y* − y₀)/(s·e), donde y₀ es la altura del portero en el tope izquierdo, s = ±1 el sentido y e la escala. Se calibra moviendo cada carro a 5 posiciones y midiendo el bloque en la imagen (Figura 13)."),
   ...FIGURA("calib_izq.png", 430, "Calibración de la posición del portero izquierdo: el carro en T = 40, 60, 105, 150 y 170 mm con la regla en mm de la vista."),
   H2("10.5 Decisión del golpe"),
   P("El golpe se ordena cuando se cumplen a la vez: faltan menos de **0,08 s** para que la bola llegue a la línea, la bola está a menos de **25 mm** de la línea y viene a más de **80 mm/s**. Los tres umbrales se eligieron con una búsqueda en cuadrícula sobre las grabaciones del 3 de noviembre: con solo el criterio de tiempo el golpe salía 0,2–0,8 s antes porque la bola frena o rebota. Después de un golpe se esperan 0,9 s antes de otro (pulso de 350 ms más el regreso del émbolo)."),
@@ -431,7 +435,7 @@ add(H1("14. Competencias adquiridas"),
 add(H1("15. Evidencia audiovisual"),
   ...TABLA("Videos solicitados (sección 15 del enunciado).",
     ["Video", "Evidencia disponible", "Estado"],
-    [["Construcción o montaje", "Fotografías y videos del equipo durante el armado", "Por recopilar"],
+    [["Construcción o montaje", "Fotos y videos del armado en la carpeta de Drive del proyecto (Figuras 3, 5 y 6)", "Disponible"],
      ["Pruebas de movimiento de cada nave", "Calibración automática y modo manual", "Por grabar con el firmware FreeRTOS"],
      ["Prueba del golpe", "Prueba con la tecla j/k", "Por grabar"],
      ["Calibración o validación de la detección", "registros/20261030_*.mp4 y 20261102_*.mp4 (seguimiento con el estimador)", "Disponible"],
@@ -439,6 +443,7 @@ add(H1("15. Evidencia audiovisual"),
      ["Integración hardware–software", "registros/20261103_194123 (455 s, 103 golpes)", "Disponible (CSV); video del sistema completo por grabar"],
      ["Partida automática completa", "Partida hasta 10 goles", "Por grabar"]],
     [30, 48, 22]),
+  P("Las fotografías y los videos de la construcción, del prototipo LEGO y de las primeras pruebas están en la carpeta de Drive del proyecto: https://drive.google.com/drive/folders/1vlkfr6HJXub9V8-3F7fFBQIXRdYFUJa1 . El código fuente está en https://github.com/HermanEcheverria/Porteros ."),
   P("Los videos de `vision/registros` muestran la información de diagnóstico que pide el enunciado: modo, cuadros por segundo, posición y velocidad de la bola, objetivo de cada portero, tiempo hasta el cruce y marcador."));
 
 // 16
