@@ -1,0 +1,19 @@
+# Solo se versiona el proyecto Porteros Robot (esta carpeta tambien tiene otras tareas del curso)
+/*.docx
+/*.cpp
+/*.exe
+/semaforos/
+
+# Python
+__pycache__/
+*.pyc
+
+# Videos de las sesiones (pesan ~60 MB cada uno); los CSV si se suben como evidencia
+vision/registros/*.mp4
+# Modelo YOLO (se descarga solo al usar vision_yolo.py)
+*.pt
+
+# Archivos temporales de Office / sistema
+~$*
+desktop.ini
+Thumbs.db
