@@ -74,16 +74,21 @@ function TABLA(titulo, encabezado, filas, anchos) {
 
 // ---------- portada ----------
 const portada = [
-  new Paragraph({ spacing: { before: 1200 }, alignment: AlignmentType.CENTER, children: [new TextRun({ text: "UNIVERSIDAD DEL ISTMO", bold: true, size: 28, color: AZUL })] }),
+  new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 160 }, children: [new ImageRun({ type: "png",
+    data: fs.readFileSync(path.join(FIG, "escudo_unis.png")), transformation: { width: 110, height: 134 },
+    altText: { title: "Escudo UNIS", description: "Escudo de la Universidad del Istmo", name: "escudo_unis.png" } })] }),
+  new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "UNIVERSIDAD DEL ISTMO", bold: true, size: 28, color: AZUL })] }),
   new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Facultad de Ingeniería", size: 24 })] }),
-  new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 900 }, children: [new TextRun({ text: "Sistemas Informáticos en Tiempo Real", size: 24 })] }),
+  new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 500 }, children: [new TextRun({ text: "Sistemas Informáticos en Tiempo Real", size: 24 })] }),
   new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "PORTEROS ROBOT", bold: true, size: 56, color: AZUL })] }),
   new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 200 }, children: [new TextRun({ text: "Juego de mesa autónomo inspirado en Hyperlaps Initial", size: 30 })] }),
-  new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 900 }, children: [new TextRun({ text: "Documento técnico del proyecto integrador", italics: true, size: 24 })] }),
-  ...FIGURA("camara_cenital.png", 380, "Vista cenital de la cancha con los dos porteros, tomada por la cámara del sistema."),
+  new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 300 }, children: [new TextRun({ text: "Documento técnico del proyecto integrador", italics: true, size: 24 })] }),
+  ...FIGURA("camara_cenital.png", 300, "Vista cenital de la cancha con los dos porteros, tomada por la cámara del sistema."),
   new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 400 }, children: [new TextRun({ text: "Catedrático: Ing. Mario Porras", size: 24 })] }),
-  new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Integrantes: ______________________________________________", size: 24 })] }),
-  new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Guatemala, noviembre de 2026", size: 24 })] }),
+  new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 200 }, children: [new TextRun({ text: "Integrantes", bold: true, size: 24 })] }),
+  ...["Hermán Andrés Echeverría Rojas", "Jorge Armando Ferguson Yaeggy", "Sofía Isabela Sandoval Vásquez", "Jose Gregorio Coronel Colombo"]
+    .map((n) => new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: n, size: 24 })] })),
+  new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 200 }, children: [new TextRun({ text: "Guatemala, noviembre de 2026", size: 24 })] }),
 ];
 
 // ---------- contenido ----------
@@ -153,7 +158,7 @@ add(H1("3. Análisis del problema y planteamiento de la solución"),
     ["Decisión", "Alternativas", "Elegida y justificación"],
     [["Sensado de la bola", "Sensor de distancia VL53L0X en cada portero; matriz de sensores; cámara", "Cámara cenital: entrega x, y y velocidad de toda la cancha (el VL53L0X solo mide una distancia y no ve los rebotes)"],
      ["Procesamiento de visión", "En el Arduino; en la laptop", "Laptop con Python/OpenCV: el Uno no tiene memoria ni CPU para imágenes"],
-     ["Detección de la bola", "Resta de fondo; red neuronal YOLO; color HSV", "Color HSV: rápido (64 fps), robusto con bola azul sobre fondo blanco; YOLO se probó y era más lento"],
+     ["Detección de la bola", "Resta de fondo; red neuronal YOLO; color HSV", "Color HSV: rápido (64 fps), robusto con bola azul o naranja sobre fondo blanco (busca los dos colores a la vez); YOLO se probó y era más lento"],
      ["Mecánica de las naves", "Perfil 2020 + GT2 (referencia); riel de impresora", "Riel, banda y motor de impresora Epson L120 reutilizados: guiado ya alineado y bajo costo (solución equivalente permitida en 5.1)"],
      ["Posición del carro", "Encoder; posición por tiempo", "Dead reckoning por tiempo calibrado contra los dos finales de carrera (no hay encoder disponible)"],
      ["Golpe", "Relé; MOSFET IRFZ44N; puente H L298N", "L298N dedicado a los solenoides: el relé disponible estaba dañado; el L298N aísla al Arduino y trae diodos de protección"],
@@ -192,7 +197,7 @@ add(H1("5. Diseño y construcción mecánica"),
      ["Geometría", "Octágono simétrico", "Octágono: paredes rectas de 240 mm arriba y abajo + 4 diagonales", "Igual a la referencia"],
      ["Paredes", "379 x 55 x 4 mm, transparentes", "Cartón rígido, 75 mm de alto", "Material disponible; altura suficiente para la bola"],
      ["Porterías", "Una por lado", "Dos, de 300 mm de poste a poste", "Mínimo obligatorio de dos jugadores"],
-     ["Bola", "Acero pulido", "Bola azul", "Color con alto contraste para la visión por cámara"],
+     ["Bola", "Acero pulido", "Bola azul o naranja", "Colores con alto contraste sobre la cancha blanca; la visión busca los dos a la vez y se puede cambiar de bola sin reconfigurar"],
      ["Naves", "Dos como mínimo", "Dos carros de impresora Epson L120", "Desplazamiento horizontal sobre riel"]],
     [16, 22, 34, 28]),
   ...FIGURA("vista_enderezada.png", 330, "Vista enderezada por homografía: cada píxel equivale a 1/1,5 mm; las paredes rectas quedan en y = 0 y y = 430 mm."),
@@ -359,7 +364,7 @@ add(H1("10. Percepción, predicción e intercepción"),
   B("Latencia de ≈ 100 ms: a 1 m/s la bola avanza 100 mm antes de procesarse; la compensación depende de que la velocidad no cambie en ese tiempo."),
   B("La posición del carro no se mide: se estima por tiempo (error típico ±8 mm, hasta 14 mm)."),
   B("La cámara se recalibra cada vez que el teléfono se mueve."),
-  B("Con la mano o un objeto azul en la cancha pueden aparecer detecciones falsas."));
+  B("Con la mano o un objeto azul o naranja en la cancha, o con las dos bolas a la vez, pueden aparecer detecciones falsas."));
 
 // 11
 add(H1("11. Detección de anotaciones y marcador"),

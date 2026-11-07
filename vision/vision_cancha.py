@@ -6,8 +6,10 @@ Vision de la cancha - Porteros Robot
      La imagen se "endereza" de la cara de un portero a la del otro y cada pixel pasa a ser
      milimetros reales. Se guarda en calibracion.json (solo se hace una vez).
   2) Deteccion de la bola (tecla M cambia el modo):
-     - color (por defecto): la bola azul se separa por color HSV. Clic DERECHO sobre la bola
-       toma su color; afina con los sliders de la ventana "Color" y guarda con G.
+     - color (por defecto): la bola se separa por color HSV. Hay dos colores (azul y naranja)
+       y se buscan LOS DOS a la vez, asi sirve cualquiera de las dos pelotas sin cambiar nada.
+       B elige cual color se ajusta; clic DERECHO sobre la bola toma su color para ese perfil;
+       afina con los sliders de la ventana "Color" y guarda con G.
      - fondo: resta contra la cancha vacia (quita la bola y presiona F). Detecta TODO lo que se mueve.
   3) Un filtro de Kalman suaviza la posicion y estima la velocidad; con eso se predice donde
      cruza la linea de cada porteria y se manda al Arduino de ese portero:
@@ -17,6 +19,7 @@ IMPORTANTE: en la app iVCam del iPhone fija la exposicion, el balance de blancos
 (sin automaticos), o el color de la bola cambia con la luz. Usa "Single Camera" para 60 fps.
 
 Teclas: K = recalibrar esquinas   M = modo color/fondo   G = guardar color   F = guardar fondo
+        B = elegir color que se ajusta (azul / naranja)
         + / - = sensibilidad (modo fondo)   C = cambiar camara   R = grabar CSV + video
         A = porteros automaticos ON/OFF     L = calibrar carros (manda 'c')   Esc = salir
         N = marcador a 0 - 0 (tambien vuelve solo a 0 - 0 cuando alguien llega a GOLES_GANAR)
@@ -54,7 +57,8 @@ MARGEN_MM = 40        # la vista se extiende esto fuera de la cancha: la bola pe
                       # se ve completa (por su altura, en perspectiva "se sale" del piso)
 AREA_MIN_MM2 = 150    # mancha minima para ser bola (~1.4 cm de diametro)
 AREA_MAX_MM2 = 4000
-HSV_AZUL = [95, 130, 100, 255, 50, 255]   # Hmin Hmax Smin Smax Vmin Vmax (H va de 0 a 179)
+# Hmin Hmax Smin Smax Vmin Vmax (H va de 0 a 179); se buscan todos a la vez
+COLORES_INICIALES = {"azul": [95, 130, 100, 255, 50, 255], "naranja": [1, 25, 185, 255, 159, 255]}
 
 # ---- porteros (medir en la cancha real) ----
 # x_linea: x (mm) del CENTRO de la bola cuando toca la punta de golpe del portero
@@ -120,7 +124,9 @@ TOPES = [179, 179, 255, 255, 255, 255]
 
 esquinas = []
 resolucion = None          # resolucion de la camara con la que se marcaron las esquinas
-hsv = list(HSV_AZUL)
+colores = {n: list(r) for n, r in COLORES_INICIALES.items()}
+activo = "azul"            # color que editan los sliders y el clic derecho
+hsv = colores[activo]
 umbral = 35
 plano_actual = None        # ultima vista enderezada (para tomar el color con clic derecho)
 
@@ -143,7 +149,18 @@ def tomar_color(x, y):
     hsv[:] = [max(0, h - 12), min(179, h + 12), max(0, s - 70), 255, max(0, v - 80), 255]
     for nombre, valor in zip(SLIDERS, hsv):
         cv2.setTrackbarPos(nombre, VENTANA_COLOR, valor)
-    print(f"Color tomado: H={h} S={s} V={v} -> rango {hsv} (G para guardar)")
+    print(f"Color {activo} tomado: H={h} S={s} V={v} -> rango {hsv} (G para guardar)")
+
+
+def cambiar_color():
+    """B: pasa los sliders y el clic derecho al otro color."""
+    global activo, hsv
+    nombres = list(colores)
+    activo = nombres[(nombres.index(activo) + 1) % len(nombres)]
+    hsv = colores[activo]
+    for nombre, valor in zip(SLIDERS, hsv):
+        cv2.setTrackbarPos(nombre, VENTANA_COLOR, valor)
+    print(f"Ajustando el color {activo}: {hsv}")
 
 
 def cargar():
@@ -154,14 +171,18 @@ def cargar():
         esquinas.extend([tuple(p) for p in d["esquinas"]])
         r = d.get("resolucion", (1280, 720))                  # las calibraciones viejas eran a 1280x720
         resolucion = tuple(r) if r else None
-        if "hsv" in d:
-            hsv[:] = d["hsv"]
+        if "colores" in d:
+            for n, r in d["colores"].items():
+                colores.setdefault(n, list(r))[:] = r
+        elif "hsv" in d:                                       # formato viejo: un solo color
+            h0 = d["hsv"][0]
+            colores["naranja" if h0 < 40 else "azul"][:] = d["hsv"]
         print("Calibracion cargada de", ARCHIVO)
 
 
 def guardar():
     with open(ARCHIVO, "w") as f:
-        json.dump({"esquinas": esquinas, "resolucion": resolucion, "hsv": hsv,
+        json.dump({"esquinas": esquinas, "resolucion": resolucion, "colores": colores,
                    "ancho_mm": ANCHO_MM, "alto_mm": ALTO_MM}, f)
     print("Calibracion guardada en", ARCHIVO)
 
@@ -230,7 +251,10 @@ def mejor_mancha(m):
 
 def buscar_color(plano):
     img = cv2.cvtColor(cv2.GaussianBlur(plano, (5, 5), 0), cv2.COLOR_BGR2HSV)
-    m = cv2.inRange(img, np.array(hsv[0::2]), np.array(hsv[1::2]))
+    m = None
+    for r in colores.values():
+        mi = cv2.inRange(img, np.array(r[0::2]), np.array(r[1::2]))
+        m = mi if m is None else cv2.bitwise_or(m, mi)
     k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
     m = cv2.morphologyEx(m, cv2.MORPH_OPEN, k)      # quita puntitos sueltos
     m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, k)     # rellena huecos (brillos, pentagonos)
@@ -253,7 +277,7 @@ def crear_sliders():
 
 def leer_sliders():
     try:
-        hsv[:] = [cv2.getTrackbarPos(n, VENTANA_COLOR) for n in SLIDERS]
+        hsv[:] = [cv2.getTrackbarPos(n, VENTANA_COLOR) for n in SLIDERS]   # edita el color activo
     except cv2.error:            # la ventana de sliders se cerro: se vuelve a abrir
         crear_sliders()
 
@@ -547,7 +571,7 @@ def main():
         cv2.rectangle(vista, (0, 0), (W // 2 + 120 if partida.ganador else W // 2 - 60, 26), (0, 0, 0), -1)
         cv2.putText(vista, marcador, (8, 18), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 255), 2)
         cv2.rectangle(vista, (0, H - 34), (W, H), (0, 0, 0), -1)
-        estado = f"{'AUTO' if auto else 'manual'} | {modo} | {fps:4.1f} fps" + (" | REC" if registro else "")
+        estado = f"{'AUTO' if auto else 'manual'} | {modo} (ajusta {activo}) | {fps:4.1f} fps" + (" | REC" if registro else "")
         cv2.putText(vista, estado, (8, H - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 255), 1)
         cv2.putText(vista, texto, (8, H - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
         cv2.imshow(VENTANA, vista)
@@ -560,6 +584,7 @@ def main():
         if k in (ord('m'), ord('M')):
             modo = "fondo" if modo == "color" else "color"; kalman.reiniciar(); print("Modo:", modo)
         if k in (ord('g'), ord('G')): guardar()
+        if k in (ord('b'), ord('B')): cambiar_color()
         if k in (ord('f'), ord('F')):
             acum, n = np.zeros((H, W), np.float32), 0
             while n < 15:                            # promedio de 15 fotos: menos ruido
